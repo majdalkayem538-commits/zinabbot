@@ -351,7 +351,7 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     pin_note = "🔐 أول دخول للمحتوى سيتطلب منك إنشاء PIN أمان." if not row["security_pin"] else "🔐 استخدم PIN الأمان الخاص بك للدخول للمحتوى."
     await context.bot.send_message(
         user_id,
-        f"🎉 تم قبول طلبك بنجاح\n\n🧾 رقم الطلب: {row['order_id']}\n📚 المواد المفعلة لك:\n{get_subjects_text(row['selected_subjects'])}\n\n{pin_note}",
+        f"✅ تم الدفع بنجاح، يمكنك الآن الدخول إلى الفيديوهات.\n\n🧾 رقم الطلب: {row['order_id']}\n📚 المواد المفعلة لك:\n{get_subjects_text(row['selected_subjects'])}\n\n{pin_note}",
         reply_markup=main_menu_keyboard(True, False),
     )
 
@@ -365,7 +365,7 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(
         ADMIN_ID,
-        f"✅ تم قبول الطلب\n\n🧾 رقم الطلب: {row['order_id']}\n👤 الاسم: {user.first_name}\n🔗 اليوزر: @{user.username if user.username else 'لا يوجد'}\n🆔 ID: {user_id}\n💳 الطريقة: {get_payment_label(row['selected_payment'])}\n📚 المواد المفعلة:\n{get_subjects_text(row['selected_subjects'])}"
+        f"✅ تم قبول الطلب\n\n🧾 رقم الطلب: {row['order_id']}\n👤 الاسم: {user.first_name}\n🔗 اليوزر: @{user.username if user.username else 'لا يوجد'}\n🆔 ID: {user_id}\n💳 الطريقة: {get_payment_label(row['selected_payment'])}\n📚 المواد المفعلة:\n{get_subjects_text(row['selected_subjects'])}\n\nالمستخدم صاحب اليوزر @{user.username if user.username else 'لا يوجد'} أصبح بإمكانه الدخول إلى مكتبة الفيديوهات."
     )
 
 async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -551,19 +551,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if row["form_step"] == "cash_phone":
-        cursor.execute("UPDATE users SET cash_phone=?, form_step='cash_amount' WHERE user_id=?", (text, user.id))
-        conn.commit()
-        await update.message.reply_text("💵 أرسل المبلغ المدفوع.")
-        return
-
-    if row["form_step"] == "cash_amount":
-        cursor.execute("UPDATE users SET cash_amount=?, form_step='cash_subject_count' WHERE user_id=?", (text, user.id))
-        conn.commit()
-        await update.message.reply_text("🔢 أرسل عدد المواد المسجلة.")
-        return
-
-    if row["form_step"] == "cash_subject_count":
-        cursor.execute("UPDATE users SET cash_subject_count=?, form_step='cash_subject_names' WHERE user_id=?", (text, user.id))
+        cursor.execute("UPDATE users SET cash_phone=?, form_step='cash_subject_names' WHERE user_id=?", (text, user.id))
         conn.commit()
         await update.message.reply_text("📝 أرسل أسماء المواد المسجل عليها الطالب.")
         return
@@ -592,8 +580,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🆔 ID: {user.id}\n"
             f"👤 Username: @{user.username if user.username else 'بدون'}\n"
             f"📞 الهاتف: {refreshed['cash_phone']}\n"
-            f"💵 المبلغ المدفوع: {refreshed['cash_amount']}\n"
-            f"🔢 عدد المواد: {refreshed['cash_subject_count']}\n"
             f"📝 أسماء المواد كما كتبها الطالب: {text}\n"
             f"📚 المواد المختارة داخل البوت:\n{get_subjects_text(refreshed['selected_subjects'])}\n"
             f"💰 الإجمالي المحسوب داخل البوت: {total}$\n"
