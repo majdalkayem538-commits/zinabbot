@@ -522,10 +522,9 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = update.effective_user
     ensure_user(user.id, user.username, user.first_name)
-    text = update.message.text.strip()
     row = get_user_row(user.id)
+    text = update.message.text.strip()
 
-    # Broadcast from admin
     if is_admin(user.id) and get_state("broadcast_pending") == "1":
         cursor.execute("SELECT user_id FROM users WHERE approved_subjects IS NOT NULL AND approved_subjects != ''")
         users = [r[0] for r in cursor.fetchall()]
@@ -540,7 +539,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ تم إرسال الإعلان إلى {sent} مستخدم.")
         return
 
-    # Support messages
     if row["support_pending"] == 1:
         await context.bot.send_message(
             ADMIN_ID,
@@ -555,7 +553,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✅ تم إرسال رسالتك إلى الدعم.")
         return
 
-    # PIN lock check
     locked, until = is_locked_out(user.id)
     if locked:
         await update.message.reply_text(
@@ -563,7 +560,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # PIN creation / login
     if row["approved_subjects"] and text.isdigit() and len(text) >= MIN_PIN_LENGTH:
         if not row["security_pin"]:
             cursor.execute(
@@ -593,8 +589,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Cash in person flow: full name
-          if row["form_step"] == "cash_full_name":
+    if row["form_step"] == "cash_full_name":
         cursor.execute(
             "UPDATE users SET cash_full_name=?, form_step='cash_phone' WHERE user_id=?",
             (text, user.id),
@@ -603,8 +598,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📞 أرسل رقم هاتف الطالب.")
         return
 
-    # Cash in person flow: phone
-          if row["form_step"] == "cash_phone":
+    if row["form_step"] == "cash_phone":
         cursor.execute(
             "UPDATE users SET cash_phone=?, form_step='cash_subject_names' WHERE user_id=?",
             (text, user.id),
@@ -613,8 +607,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📝 أرسل أسماء المواد المسجل عليها الطالب.")
         return
 
-    # Cash in person flow: subject names
-          if row["form_step"] == "cash_subject_names":
+    if row["form_step"] == "cash_subject_names":
         cursor.execute(
             """UPDATE users
                SET cash_subject_names=?, form_step=NULL, payment_status='pending', request_at=?
@@ -654,10 +647,11 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             (sent.message_id, order_id, user.id),
         )
         conn.commit()
+        await update.message.reply_text(f"✅ تم إرسال طلبك إلى الأدمن للمراجعة.\n🧾 رقم طلبك: {order_id}")
+        return
 
-        await update.message.reply_text(
-            f"✅ تم إرسال طلبك إلى الأدمن للمراجعة.\n🧾 رقم طلبك: {order_id}"
-        )
+    if row["approved_subjects"] and not row["security_pin"]:
+        await update.message.reply_text(security_intro_text(user.id))
         return
 
     # If approved user has no PIN yet
