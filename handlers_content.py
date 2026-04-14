@@ -522,8 +522,10 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = update.effective_user
     ensure_user(user.id, user.username, user.first_name)
-    row = get_user_row(user.id)
     text = update.message.text.strip()
+
+    row = get_user_row(user.id)
+    await update.message.reply_text(f"DEBUG: form_step={row['form_step']} | text={text}")
 
     if is_admin(user.id) and get_state("broadcast_pending") == "1":
         cursor.execute("SELECT user_id FROM users WHERE approved_subjects IS NOT NULL AND approved_subjects != ''")
