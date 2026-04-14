@@ -594,7 +594,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Cash in person flow: full name
-    if row["form_step"] == "cash_full_name":
+          if row["form_step"] == "cash_full_name":
         cursor.execute(
             "UPDATE users SET cash_full_name=?, form_step='cash_phone' WHERE user_id=?",
             (text, user.id),
@@ -604,7 +604,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Cash in person flow: phone
-    if row["form_step"] == "cash_phone":
+          if row["form_step"] == "cash_phone":
         cursor.execute(
             "UPDATE users SET cash_phone=?, form_step='cash_subject_names' WHERE user_id=?",
             (text, user.id),
@@ -614,7 +614,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Cash in person flow: subject names
-    if row["form_step"] == "cash_subject_names":
+          if row["form_step"] == "cash_subject_names":
         cursor.execute(
             """UPDATE users
                SET cash_subject_names=?, form_step=NULL, payment_status='pending', request_at=?
