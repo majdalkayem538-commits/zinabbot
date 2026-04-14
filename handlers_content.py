@@ -525,8 +525,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
 
     row = get_user_row(user.id)
-    await update.message.reply_text(f"DEBUG: form_step={row['form_step']} | text={text}")
-
+    
     if is_admin(user.id) and get_state("broadcast_pending") == "1":
         cursor.execute("SELECT user_id FROM users WHERE approved_subjects IS NOT NULL AND approved_subjects != ''")
         users = [r[0] for r in cursor.fetchall()]
@@ -541,7 +540,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ تم إرسال الإعلان إلى {sent} مستخدم.")
         return
 
-    if row["support_pending"] == 1:
+    if row["support_pending"] == 1 and not row["form_step"]:
         await context.bot.send_message(
             ADMIN_ID,
             f"📩 رسالة دعم جديدة\n\n"
