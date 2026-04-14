@@ -551,34 +551,55 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     locked, until = is_locked_out(user.id)
     if locked:
-        await update.message.reply_text(f"⛔ تم قفل الدخول مؤقتاً بسبب محاولات PIN خاطئة كثيرة.\nحاول مجدداً بعد {until}.")
+        await update.message.reply_text(
+            f"⛔ تم قفل الدخول مؤقتاً بسبب محاولات PIN خاطئة كثيرة.\nحاول مجدداً بعد {until}."
+        )
         return
 
     # PIN creation/login
     if row["approved_subjects"] and text.isdigit() and len(text) >= MIN_PIN_LENGTH:
         if not row["security_pin"]:
-            cursor.execute("UPDATE users SET security_pin=?, pin_attempts=0, locked_until=NULL WHERE user_id=?", (hash_pin(text), user.id))
+            cursor.execute(
+                "UPDATE users SET security_pin=?, pin_attempts=0, locked_until=NULL WHERE user_id=?",
+                (hash_pin(text), user.id),
+            )
             conn.commit()
             start_session(user.id)
-            await update.message.reply_text("✅ تم إنشاء PIN الأمان وتسجيل دخولك بنجاح.", reply_markup=main_menu_keyboard(True, True))
+            await update.message.reply_text(
+                "✅ تم إنشاء PIN الأمان وتسجيل دخولك بنجاح.",
+                reply_markup=main_menu_keyboard(True, True),
+            )
             return
+
         if row["security_pin"] == hash_pin(text):
             clear_failed_pin(user.id)
             start_session(user.id)
-            await update.message.reply_text("✅ تم التحقق من PIN وفتح الجلسة.", reply_markup=main_menu_keyboard(True, True))
+            await update.message.reply_text(
+                "✅ تم التحقق من PIN وفتح الجلسة.",
+                reply_markup=main_menu_keyboard(True, True),
+            )
             return
+
         attempts = record_failed_pin(user.id)
-        await update.message.reply_text(f"❌ PIN غير صحيح.\nالمحاولات المتبقية قبل القفل: {max(0, 5 - attempts)}")
+        await update.message.reply_text(
+            f"❌ PIN غير صحيح.\nالمحاولات المتبقية قبل القفل: {max(0, 5 - attempts)}"
+        )
         return
 
-       if row["form_step"] == "cash_full_name":
-        cursor.execute("UPDATE users SET cash_full_name=?, form_step='cash_phone' WHERE user_id=?", (text, user.id))
+    if row["form_step"] == "cash_full_name":
+        cursor.execute(
+            "UPDATE users SET cash_full_name=?, form_step='cash_phone' WHERE user_id=?",
+            (text, user.id),
+        )
         conn.commit()
         await update.message.reply_text("📞 أرسل رقم هاتف الطالب.")
         return
 
     if row["form_step"] == "cash_phone":
-        cursor.execute("UPDATE users SET cash_phone=?, form_step='cash_subject_names' WHERE user_id=?", (text, user.id))
+        cursor.execute(
+            "UPDATE users SET cash_phone=?, form_step='cash_subject_names' WHERE user_id=?",
+            (text, user.id),
+        )
         conn.commit()
         await update.message.reply_text("📝 أرسل أسماء المواد المسجل عليها الطالب.")
         return
@@ -618,10 +639,14 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(keyboard),
         )
 
-        cursor.execute("UPDATE users SET admin_message_id=?, order_id=? WHERE user_id=?", (sent.message_id, order_id, user.id))
+        cursor.execute(
+            "UPDATE users SET admin_message_id=?, order_id=? WHERE user_id=?",
+            (sent.message_id, order_id, user.id),
+        )
         conn.commit()
         await update.message.reply_text(f"✅ تم إرسال طلبك إلى الأدمن للمراجعة.\n🧾 رقم طلبك: {order_id}")
         return
+
     if row["approved_subjects"] and not row["security_pin"]:
         await update.message.reply_text(security_intro_text(user.id))
         return
