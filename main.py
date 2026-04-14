@@ -39,8 +39,8 @@ app.add_handler(CallbackQueryHandler(continue_last, pattern=r"^continue_last$"))
 
 app.add_handler(MessageHandler(filters.VIDEO, admin_video_handler))
 app.add_handler(MessageHandler(filters.PHOTO, receive_proof))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, admin_text_handler))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler), group=0)
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, admin_text_handler), group=1)
 
 print("Bot Running as Render Background Worker...")
 app.run_polling(allowed_updates=None, drop_pending_updates=False)
