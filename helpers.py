@@ -241,19 +241,35 @@ def get_user_row(user_id: int) -> dict:
         SELECT payment_status, order_id, selected_payment, selected_subjects, approved_subjects,
                support_pending, last_lecture_compound, form_step, cash_full_name, cash_phone,
                cash_amount, cash_subject_count, cash_subject_names, security_pin, is_verified,
-               session_expires_at, pin_attempts, locked_until
+               session_expires_at, pin_attempts, locked_until, proof_message_id, admin_message_id
         FROM users WHERE user_id=?
     """, (user_id,))
     row = cursor.fetchone()
+
     if not row:
         return {
-            "payment_status": "none", "order_id": None, "selected_payment": None,
-            "selected_subjects": [], "approved_subjects": [], "support_pending": 0,
-            "last_lecture_compound": None, "form_step": None, "cash_full_name": None,
-            "cash_phone": None, "cash_amount": None, "cash_subject_count": None,
-            "cash_subject_names": None, "security_pin": None, "is_verified": 0,
-            "session_expires_at": None, "pin_attempts": 0, "locked_until": None,
+            "payment_status": "none",
+            "order_id": None,
+            "selected_payment": None,
+            "selected_subjects": [],
+            "approved_subjects": [],
+            "support_pending": 0,
+            "last_lecture_compound": None,
+            "form_step": None,
+            "cash_full_name": None,
+            "cash_phone": None,
+            "cash_amount": None,
+            "cash_subject_count": None,
+            "cash_subject_names": None,
+            "security_pin": None,
+            "is_verified": 0,
+            "session_expires_at": None,
+            "pin_attempts": 0,
+            "locked_until": None,
+            "proof_message_id": None,
+            "admin_message_id": None,
         }
+
     return {
         "payment_status": row["payment_status"],
         "order_id": row["order_id"],
@@ -273,8 +289,9 @@ def get_user_row(user_id: int) -> dict:
         "session_expires_at": row["session_expires_at"],
         "pin_attempts": row["pin_attempts"],
         "locked_until": row["locked_until"],
+        "proof_message_id": row["proof_message_id"],
+        "admin_message_id": row["admin_message_id"],
     }
-
 def user_has_any_approved_subject(user_id: int) -> bool:
     return len(get_user_row(user_id)["approved_subjects"]) > 0
 
