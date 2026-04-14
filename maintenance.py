@@ -159,7 +159,7 @@ async def maybe_send_pending_reminder(application, force: bool = False) -> None:
 
 async def send_startup_notice(application) -> None:
     try:
-        await application.bot.send_message(ADMIN_ID, "✅ البوت اشتغل بنجاح على Render وهو جاهز الآن.")
+        await application.bot.send_message(ADMIN_ID, "✅ البوت يعمل بنجاح  .")
     except Exception:
         logger.exception("Failed to send startup notice")
 
@@ -190,7 +190,7 @@ async def error_handler(update, context) -> None:
         summary = str(context.error)[:800] if context.error else "Unknown error"
         await context.bot.send_message(
             ADMIN_ID,
-            f"🚨 صار خطأ داخل البوت\n\n{summary}"
+            f"🚨 يوجد خطأ داخل البوت\n\n{summary}"
         )
         set_state("error_last_sent_at", now_str())
     except Exception:
