@@ -30,7 +30,7 @@ def years_keyboard(selected_subjects: list[str]):
         rows.append([InlineKeyboardButton(label, callback_data=f"year_open|{year_key}")])
     total = calc_total(selected_subjects)
     rows.append([InlineKeyboardButton(f"💳 متابعة الدفع ({len(selected_subjects)} مادة - {total}$)", callback_data="menu_checkout")])
-    rows.append([InlineKeyboardButton("🗑 إفراغ الاختيار", callback_data="clear_selection")])
+    rows.append([InlineKeyboardButton("🗑 إفراغ السلة", callback_data="clear_selection")])
     rows.append([InlineKeyboardButton("🏠 رجوع", callback_data="menu_home")])
     return InlineKeyboardMarkup(rows)
 
@@ -49,7 +49,7 @@ def year_subjects_keyboard(year_key: str, selected_subjects: list[str]):
                 )
             ])
             rows.append([InlineKeyboardButton("ℹ️ تفاصيل المادة", callback_data=f"subject_info|{subject_key}")])
-    rows.append([InlineKeyboardButton("⬅️ رجوع للسنوات", callback_data="menu_subjects")])
+    rows.append([InlineKeyboardButton("⬅️ رجوع للمواد", callback_data="menu_subjects")])
     return InlineKeyboardMarkup(rows)
 
 
