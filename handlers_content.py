@@ -201,7 +201,11 @@ async def payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         conn.commit()
         await query.message.reply_text(
-            f"💵 تم اختيار الدفع نقداً.\n\n🧾 رقم الطلب: {order_id}\n📚 المواد المختارة:\n{get_subjects_text(row['selected_subjects'])}\n💵 الإجمالي: {total}$\n\nأرسل الآن الاسم الثلاثي للطالب."
+            f"💵 تم اختيار الدفع نقداً.\n\n"
+            f"🧾 رقم الطلب: {order_id}\n"
+            f"📚 المواد المختارة داخل البوت:\n{get_subjects_text(row['selected_subjects'])}\n"
+            f"💵 الإجمالي: {total}$\n\n"
+            f"أرسل الآن الاسم الثلاثي للطالب."
         )
         return
 
@@ -338,7 +342,15 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cursor.execute(
         """INSERT INTO sales (user_id, order_id, subjects, payment_method, amount, status, approved_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)""",
-        (user_id, row["order_id"], get_subjects_text(row["selected_subjects"]), get_payment_label(row["selected_payment"]), total, "approved", approved_at),
+        (
+            user_id,
+            row["order_id"],
+            get_subjects_text(row["selected_subjects"]),
+            get_payment_label(row["selected_payment"]),
+            total,
+            "approved",
+            approved_at,
+        ),
     )
     conn.commit()
 
@@ -348,10 +360,19 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             pass
 
-    pin_note = "🔐 أول دخول للمحتوى سيتطلب منك إنشاء PIN أمان." if not row["security_pin"] else "🔐 استخدم PIN الأمان الخاص بك للدخول للمحتوى."
+    pin_note = (
+        "🔐 أول دخول للمحتوى سيتطلب منك إنشاء PIN أمان."
+        if not row["security_pin"]
+        else "🔐 استخدم PIN الأمان الخاص بك للدخول للمحتوى."
+    )
+
     await context.bot.send_message(
         user_id,
-        f"✅ تم الدفع بنجاح، يمكنك الآن الدخول إلى الفيديوهات.\n\n🧾 رقم الطلب: {row['order_id']}\n📚 المواد المفعلة لك:\n{get_subjects_text(row['selected_subjects'])}\n\n{pin_note}",
+        f"✅ تم الدفع بنجاح\n\n"
+        f"🧾 رقم الطلب: {row['order_id']}\n"
+        f"📚 المواد المفعلة لك:\n{get_subjects_text(row['selected_subjects'])}\n\n"
+        f"يمكنك الآن الدخول إلى الفيديوهات.\n\n"
+        f"{pin_note}",
         reply_markup=main_menu_keyboard(True, False),
     )
 
@@ -365,9 +386,15 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(
         ADMIN_ID,
-        f"✅ تم قبول الطلب\n\n🧾 رقم الطلب: {row['order_id']}\n👤 الاسم: {user.first_name}\n🔗 اليوزر: @{user.username if user.username else 'لا يوجد'}\n🆔 ID: {user_id}\n💳 الطريقة: {get_payment_label(row['selected_payment'])}\n📚 المواد المفعلة:\n{get_subjects_text(row['selected_subjects'])}\n\nالمستخدم صاحب اليوزر @{user.username if user.username else 'لا يوجد'} أصبح بإمكانه الدخول إلى مكتبة الفيديوهات."
+        f"✅ تم قبول الطلب\n\n"
+        f"🧾 رقم الطلب: {row['order_id']}\n"
+        f"👤 الاسم: {user.first_name}\n"
+        f"🔗 اليوزر: @{user.username if user.username else 'لا يوجد'}\n"
+        f"🆔 ID: {user_id}\n"
+        f"💳 الطريقة: {get_payment_label(row['selected_payment'])}\n"
+        f"📚 المواد المفعلة:\n{get_subjects_text(row['selected_subjects'])}\n\n"
+        f"المستخدم صار بإمكانه الدخول إلى مكتبة الفيديوهات."
     )
-
 async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -544,7 +571,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ PIN غير صحيح.\nالمحاولات المتبقية قبل القفل: {max(0, 5 - attempts)}")
         return
 
-    if row["form_step"] == "cash_full_name":
+       if row["form_step"] == "cash_full_name":
         cursor.execute("UPDATE users SET cash_full_name=?, form_step='cash_phone' WHERE user_id=?", (text, user.id))
         conn.commit()
         await update.message.reply_text("📞 أرسل رقم هاتف الطالب.")
@@ -564,14 +591,17 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             (text, now_str(), user.id),
         )
         conn.commit()
+
         refreshed = get_user_row(user.id)
         order_id = refreshed["order_id"] or generate_order_id()
         total = calc_total(refreshed["selected_subjects"])
+
         keyboard = [
             [InlineKeyboardButton("👁 بدء المراجعة", callback_data=f"review|{user.id}")],
             [InlineKeyboardButton("✅ قبول الدفع", callback_data=f"approve|{user.id}")],
             [InlineKeyboardButton("❌ رفض الدفع", callback_data=f"reject|{user.id}")],
         ]
+
         sent = await context.bot.send_message(
             ADMIN_ID,
             f"📥 طلب تسجيل نقدي جديد\n\n"
@@ -587,11 +617,11 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📌 الحالة: pending",
             reply_markup=InlineKeyboardMarkup(keyboard),
         )
+
         cursor.execute("UPDATE users SET admin_message_id=?, order_id=? WHERE user_id=?", (sent.message_id, order_id, user.id))
         conn.commit()
         await update.message.reply_text(f"✅ تم إرسال طلبك إلى الأدمن للمراجعة.\n🧾 رقم طلبك: {order_id}")
         return
-
     if row["approved_subjects"] and not row["security_pin"]:
         await update.message.reply_text(security_intro_text(user.id))
         return
