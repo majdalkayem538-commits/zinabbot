@@ -90,7 +90,7 @@ def _find_user_brief(text: str):
 
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_admin(update.effective_user.id):
-        await update.message.reply_text("🛠 لوحة الأدمن الاحترافية", reply_markup=admin_panel_keyboard())
+        await update.message.reply_text("🛠 لوحة الأدمن", reply_markup=admin_panel_keyboard())
 
 
 async def admin_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
