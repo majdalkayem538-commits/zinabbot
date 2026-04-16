@@ -1,4 +1,3 @@
-
 import time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
@@ -8,7 +7,7 @@ from database import cursor, conn
 from helpers import (
     ensure_user, get_user_row, user_has_any_approved_subject, get_subjects_text,
     calc_total, generate_order_id, get_payment_label, now_str, is_admin,
-    get_state, set_state, get_subject, subject_is_approved_for_user, find_lecture,
+    get_state, get_subject, subject_is_approved_for_user, find_lecture,
     get_subject_title, lecture_allowed_by_order, join_subjects, is_session_valid,
     require_security, hash_pin, start_session, lock_session, is_locked_out,
     record_failed_pin, clear_failed_pin, in_private_chat
@@ -17,6 +16,7 @@ from keyboards import (
     main_menu_keyboard, years_keyboard, year_subjects_keyboard, payment_keyboard,
     approved_subjects_keyboard, lectures_keyboard
 )
+
 
 def security_intro_text(user_id: int) -> str:
     row = get_user_row(user_id)
@@ -27,6 +27,7 @@ def security_intro_text(user_id: int) -> str:
             "مثال: 2580"
         )
     return "🔑 أرسل PIN الأمان للدخول إلى المواد والمحاضرات."
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not in_private_chat(update):
@@ -40,6 +41,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             is_session_valid(user.id),
         ),
     )
+
 
 async def menu_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -58,7 +60,10 @@ async def menu_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         secure_text = "مفعّلة" if is_session_valid(user.id) else "غير مفعّلة"
         await query.message.reply_text(
             f"✨ الرئيسية\n\n🔐 حالة الحماية: {secure_text}\n\n📚 المواد المقبولة لديك:\n{approved_text}\n\n🛒 المواد المختارة حالياً:\n{selected_text}",
-            reply_markup=main_menu_keyboard(user_has_any_approved_subject(user.id), is_session_valid(user.id)),
+            reply_markup=main_menu_keyboard(
+                user_has_any_approved_subject(user.id),
+                is_session_valid(user.id),
+            ),
         )
         return
 
@@ -83,7 +88,10 @@ async def menu_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == "clear_selection":
         cursor.execute("UPDATE users SET selected_subjects='' WHERE user_id=?", (user.id,))
         conn.commit()
-        await query.message.reply_text("🗑 تم إفراغ المواد المختارة.", reply_markup=years_keyboard([]))
+        await query.message.reply_text(
+            "🗑 تم إفراغ المواد المختارة.",
+            reply_markup=years_keyboard([]),
+        )
         return
 
     if query.data == "menu_my_subjects":
@@ -114,7 +122,9 @@ async def menu_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == "menu_faq":
         await query.message.reply_text(
             FAQ_TEXT,
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 رجوع", callback_data="menu_home")]]),
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("🏠 رجوع", callback_data="menu_home")]]
+            ),
         )
         return
 
@@ -124,13 +134,18 @@ async def menu_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("📩 اكتب رسالتك الآن وسيتم إرسالها إلى الدعم.")
         return
 
+
 async def year_open(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user = query.from_user
     row = get_user_row(user.id)
     _, year_key = query.data.split("|", 1)
-    await query.message.reply_text("اختر المواد من هذه السنة:", reply_markup=year_subjects_keyboard(year_key, row["selected_subjects"]))
+    await query.message.reply_text(
+        "اختر المواد من هذه السنة:",
+        reply_markup=year_subjects_keyboard(year_key, row["selected_subjects"]),
+    )
+
 
 async def subject_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -153,7 +168,11 @@ async def subject_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     cursor.execute("UPDATE users SET selected_subjects=? WHERE user_id=?", (join_subjects(selected), user.id))
     conn.commit()
-    await query.message.reply_text("✅ تم تحديث الاختيار.", reply_markup=year_subjects_keyboard(subject["year_key"], selected))
+    await query.message.reply_text(
+        "✅ تم تحديث الاختيار.",
+        reply_markup=year_subjects_keyboard(subject["year_key"], selected),
+    )
+
 
 async def subject_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -167,6 +186,7 @@ async def subject_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"{subject['year_title']}\n\n{subject['title']}\n{subject['description']}\n\n💵 السعر: {subject.get('price', 0)}$\n🎥 عدد المحاضرات الحالية: {len(subject.get('lectures', []))}"
     )
 
+
 async def payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -178,10 +198,10 @@ async def payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if row["payment_status"] in ("pending", "reviewing"):
-   await update.message.reply_text(
-    f"🟡 لديك طلب قيد المراجعة بالفعل.\n"
-    f"🧾 رقم الطلب: {row['order_id']}"
-)
+        await query.message.reply_text(
+            f"🟡 لديك طلب قيد المراجعة بالفعل.\n"
+            f"🧾 رقم الطلب: {row['order_id'] or '-'}"
+        )
         return
 
     order_id = generate_order_id()
@@ -203,24 +223,19 @@ async def payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.commit()
 
     await query.message.reply_text(
-        f"💳 تم اختيار وسيلة الدفع: {get_payment_label(method)}
-
-"
-        f"🧾 رقم الطلب: {order_id}
-"
-        f"📚 المواد المختارة داخل البوت:
-{get_subjects_text(row['selected_subjects'])}
-"
-        f"💵 الإجمالي: {total}$
-
-"
+        f"💳 تم اختيار وسيلة الدفع: {get_payment_label(method)}\n\n"
+        f"🧾 رقم الطلب: {order_id}\n"
+        f"📚 المواد المختارة داخل البوت:\n{get_subjects_text(row['selected_subjects'])}\n"
+        f"💵 الإجمالي: {total}$\n\n"
         f"أرسل الآن الاسم الثلاثي للطالب."
     )
+
 
 async def paid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     await query.message.reply_text("📸 أرسل صورة إشعار الدفع الآن.\n⚠️ يجب أن تكون واضحة وحديثة.")
+
 
 async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not in_private_chat(update):
@@ -237,7 +252,9 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if row["payment_status"] in ("pending", "reviewing"):
-        await update.message.reply_text(f"⏳ لديك طلب قيد المراجعة بالفعل.\n🧾 رقم الطلب: {row['order_id'] or '-'}")
+        await update.message.reply_text(
+            f"⏳ لديك طلب قيد المراجعة بالفعل.\n🧾 رقم الطلب: {row['order_id'] or '-'}"
+        )
         return
 
     if time.time() - update.message.date.timestamp() > 120:
@@ -285,16 +302,19 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.commit()
     await update.message.reply_text(f"✅ تم إرسال الإشعار للمراجعة.\n🧾 رقم طلبك: {order_id}")
 
+
 async def review_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     if not is_admin(query.from_user.id):
         await query.answer("غير مسموح", show_alert=True)
         return
+
     user_id = int(query.data.split("|")[1])
     row = get_user_row(user_id)
     cursor.execute("UPDATE users SET payment_status='reviewing' WHERE user_id=?", (user_id,))
     conn.commit()
+
     await query.edit_message_caption(
         caption=(
             f"📥 طلب دفع قيد المراجعة\n\n"
@@ -312,6 +332,7 @@ async def review_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("❌ رفض الدفع", callback_data=f"reject|{user_id}")],
         ]),
     )
+
 
 async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -358,7 +379,7 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     conn.commit()
 
-    if row["proof_message_id"]:
+    if row.get("proof_message_id"):
         try:
             await context.bot.delete_message(chat_id=user_id, message_id=row["proof_message_id"])
         except Exception:
@@ -381,7 +402,7 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
-        if row["admin_message_id"]:
+        if row.get("admin_message_id"):
             await context.bot.delete_message(chat_id=ADMIN_ID, message_id=row["admin_message_id"])
         else:
             await query.message.delete()
@@ -399,6 +420,8 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📚 المواد المفعلة:\n{get_subjects_text(row['selected_subjects'])}\n\n"
         f"المستخدم صار بإمكانه الدخول إلى مكتبة الفيديوهات."
     )
+
+
 async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -415,13 +438,24 @@ async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cursor.execute(
         """INSERT INTO sales (user_id, order_id, subjects, payment_method, amount, status, approved_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)""",
-        (user_id, row["order_id"], get_subjects_text(row["selected_subjects"]), get_payment_label(row["selected_payment"]), total, "rejected", now_str()),
+        (
+            user_id,
+            row["order_id"],
+            get_subjects_text(row["selected_subjects"]),
+            get_payment_label(row["selected_payment"]),
+            total,
+            "rejected",
+            now_str(),
+        ),
     )
     conn.commit()
 
-    await context.bot.send_message(user_id, f"❌ تم رفض الطلب.\n\n🧾 رقم الطلب: {row['order_id']}\nيرجى إعادة المحاولة أو التواصل مع الأدمن.")
+    await context.bot.send_message(
+        user_id,
+        f"❌ تم رفض الطلب.\n\n🧾 رقم الطلب: {row['order_id']}\nيرجى إعادة المحاولة أو التواصل مع الأدمن.",
+    )
     try:
-        if row["admin_message_id"]:
+        if row.get("admin_message_id"):
             await context.bot.delete_message(chat_id=ADMIN_ID, message_id=row["admin_message_id"])
         else:
             await query.message.delete()
@@ -429,8 +463,9 @@ async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
     await context.bot.send_message(
         ADMIN_ID,
-        f"❌ تم رفض الطلب\n\n🧾 رقم الطلب: {row['order_id']}\n👤 الاسم: {user.first_name}\n🔗 اليوزر: @{user.username if user.username else 'لا يوجد'}\n🆔 ID: {user_id}\n💳 الطريقة: {get_payment_label(row['selected_payment'])}"
+        f"❌ تم رفض الطلب\n\n🧾 رقم الطلب: {row['order_id']}\n👤 الاسم: {user.first_name}\n🔗 اليوزر: @{user.username if user.username else 'لا يوجد'}\n🆔 ID: {user_id}\n💳 الطريقة: {get_payment_label(row['selected_payment'])}",
     )
+
 
 async def open_subject(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -453,6 +488,7 @@ async def open_subject(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"{subject['title']}\n\n{subject['description']}\n\n🔒 الترتيب الإجباري مفعّل: يجب فتح المحاضرات بالتسلسل.\nاختر المحاضرة:",
         reply_markup=lectures_keyboard(subject_key),
     )
+
 
 async def lecture_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -493,6 +529,7 @@ async def lecture_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(query.from_user.id, note, protect_content=True)
     await context.bot.send_video(chat_id=query.from_user.id, video=file_id, protect_content=True)
 
+
 async def continue_last(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -505,20 +542,29 @@ async def continue_last(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not compound or "|" not in compound:
         await query.message.reply_text("ℹ️ لم تشاهد أي محاضرة بعد.")
         return
+
     subject_key, lecture_key = compound.split("|", 1)
     if not subject_is_approved_for_user(query.from_user.id, subject_key):
         await query.message.reply_text("⚠️ آخر محاضرة غير متاحة لك حالياً.")
         return
+
     lecture = find_lecture(subject_key, lecture_key)
     if not lecture:
         await query.message.reply_text("⚠️ آخر محاضرة غير موجودة حالياً.")
         return
+
     file_id = lecture.get("file_id", "")
     if not file_id or "PLACEHOLDER" in file_id:
         await query.message.reply_text("⚠️ آخر محاضرة لم يتم رفعها بعد.")
         return
-    await context.bot.send_message(query.from_user.id, f"▶️ آخر محاضرة وصلت لها:\n{get_subject_title(subject_key)} - {lecture['title']}", protect_content=True)
+
+    await context.bot.send_message(
+        query.from_user.id,
+        f"▶️ آخر محاضرة وصلت لها:\n{get_subject_title(subject_key)} - {lecture['title']}",
+        protect_content=True,
+    )
     await context.bot.send_video(chat_id=query.from_user.id, video=file_id, protect_content=True)
+
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text or not in_private_chat(update):
@@ -535,31 +581,21 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sent = 0
         for target_id in users:
             try:
-                await context.bot.send_message(target_id, f"📢 إعلان جديد
-
-{text}")
+                await context.bot.send_message(target_id, f"📢 إعلان جديد\n\n{text}")
                 sent += 1
             except Exception:
                 pass
-        set_state("broadcast_pending", "0")
         await update.message.reply_text(f"✅ تم إرسال الإعلان إلى {sent} مستخدم.")
         return
 
     if row["support_pending"] == 1 and not row["form_step"]:
         await context.bot.send_message(
             ADMIN_ID,
-            f"📩 رسالة دعم جديدة
-
-"
-            f"👤 المستخدم: {user.first_name}
-"
-            f"🆔 ID: {user.id}
-"
-            f"👤 Username: @{user.username if user.username else 'بدون'}
-
-"
-            f"📝 الرسالة:
-{text}"
+            f"📩 رسالة دعم جديدة\n\n"
+            f"👤 المستخدم: {user.first_name}\n"
+            f"🆔 ID: {user.id}\n"
+            f"👤 Username: @{user.username if user.username else 'بدون'}\n\n"
+            f"📝 الرسالة:\n{text}",
         )
         cursor.execute("UPDATE users SET support_pending=0 WHERE user_id=?", (user.id,))
         conn.commit()
@@ -569,8 +605,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     locked, until = is_locked_out(user.id)
     if locked:
         await update.message.reply_text(
-            f"⛔ تم قفل الدخول مؤقتاً بسبب محاولات PIN خاطئة كثيرة.
-حاول مجدداً بعد {until}."
+            f"⛔ تم قفل الدخول مؤقتاً بسبب محاولات PIN خاطئة كثيرة.\nحاول مجدداً بعد {until}."
         )
         return
 
@@ -599,8 +634,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         attempts = record_failed_pin(user.id)
         await update.message.reply_text(
-            f"❌ PIN غير صحيح.
-المحاولات المتبقية قبل القفل: {max(0, 5 - attempts)}"
+            f"❌ PIN غير صحيح.\nالمحاولات المتبقية قبل القفل: {max(0, 5 - attempts)}"
         )
         return
 
@@ -651,28 +685,16 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             sent = await context.bot.send_message(
                 ADMIN_ID,
-                f"📥 طلب تسجيل جديد
-
-"
-                f"🧾 رقم الطلب: {order_id}
-"
-                f"👤 اسم الطالب: {refreshed['cash_full_name']}
-"
-                f"🆔 ID: {user.id}
-"
-                f"👤 Username: @{user.username if user.username else 'بدون'}
-"
-                f"📞 الهاتف: {refreshed['cash_phone']}
-"
-                f"📝 أسماء المواد كما كتبها الطالب: {text}
-"
-                f"📚 المواد المختارة داخل البوت:
-{get_subjects_text(refreshed['selected_subjects'])}
-"
-                f"💰 الإجمالي المحسوب داخل البوت: {total}$
-"
-                f"💳 طريقة الدفع: {get_payment_label(payment_method)}
-"
+                f"📥 طلب تسجيل جديد\n\n"
+                f"🧾 رقم الطلب: {order_id}\n"
+                f"👤 اسم الطالب: {refreshed['cash_full_name']}\n"
+                f"🆔 ID: {user.id}\n"
+                f"👤 Username: @{user.username if user.username else 'بدون'}\n"
+                f"📞 الهاتف: {refreshed['cash_phone']}\n"
+                f"📝 أسماء المواد كما كتبها الطالب: {text}\n"
+                f"📚 المواد المختارة داخل البوت:\n{get_subjects_text(refreshed['selected_subjects'])}\n"
+                f"💰 الإجمالي المحسوب داخل البوت: {total}$\n"
+                f"💳 طريقة الدفع: {get_payment_label(payment_method)}\n"
                 f"📌 الحالة: pending",
                 reply_markup=InlineKeyboardMarkup(keyboard),
             )
@@ -684,8 +706,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             conn.commit()
 
             await update.message.reply_text(
-                f"✅ تم إرسال طلبك إلى الأدمن للمراجعة.
-🧾 رقم طلبك: {order_id}"
+                f"✅ تم إرسال طلبك إلى الأدمن للمراجعة.\n🧾 رقم طلبك: {order_id}"
             )
             return
 
@@ -696,27 +717,14 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
 
         await update.message.reply_text(
-            f"✅ تم حفظ بياناتك.
-
-"
-            f"👤 الاسم الثلاثي: {refreshed['cash_full_name']}
-"
-            f"📞 الهاتف: {refreshed['cash_phone']}
-"
-            f"📝 أسماء المواد: {text}
-
-"
-            f"{payment_text}
-
-"
-            f"🧾 رقم الطلب: {order_id}
-"
-            f"📚 المواد المختارة داخل البوت:
-{get_subjects_text(refreshed['selected_subjects'])}
-"
-            f"💵 الإجمالي: {total}$
-
-"
+            f"✅ تم حفظ بياناتك.\n\n"
+            f"👤 الاسم الثلاثي: {refreshed['cash_full_name']}\n"
+            f"📞 الهاتف: {refreshed['cash_phone']}\n"
+            f"📝 أسماء المواد: {text}\n\n"
+            f"{payment_text}\n\n"
+            f"🧾 رقم الطلب: {order_id}\n"
+            f"📚 المواد المختارة داخل البوت:\n{get_subjects_text(refreshed['selected_subjects'])}\n"
+            f"💵 الإجمالي: {total}$\n\n"
             f"بعد الدفع اضغط أرسلت الدفع وأرسل صورة إشعار الدفع.",
             reply_markup=InlineKeyboardMarkup(keyboard),
         )
