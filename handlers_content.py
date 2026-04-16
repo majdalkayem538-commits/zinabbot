@@ -15,7 +15,7 @@ from helpers import (
 )
 from keyboards import (
     main_menu_keyboard, years_keyboard, year_subjects_keyboard, payment_keyboard,
-    approved_subjects_keyboard, lectures_keyboard, orders_keyboard
+    approved_subjects_keyboard, lectures_keyboard
 )
 
 def security_intro_text(user_id: int) -> str:
@@ -27,44 +27,6 @@ def security_intro_text(user_id: int) -> str:
             "مثال: 2580"
         )
     return "🔑 أرسل PIN الأمان للدخول إلى المواد والمحاضرات."
-
-
-def payment_status_text(status: str | None) -> str:
-    mapping = {
-        "none": "لا يوجد طلب حالياً",
-        "pending": "قيد الانتظار",
-        "reviewing": "قيد المراجعة",
-        "approved": "مقبول",
-        "rejected": "مرفوض",
-    }
-    return mapping.get(status or "none", status or "none")
-
-
-def build_lectures_keyboard_for_user(user_id: int, subject_key: str):
-    subject = get_subject(subject_key)
-    rows = []
-    if subject:
-        for lecture in subject.get("lectures", []):
-            lecture_key = lecture["key"]
-            cursor.execute(
-                "SELECT 1 FROM watched WHERE user_id=? AND subject_key=? AND lecture_key=?",
-                (user_id, subject_key, lecture_key),
-            )
-            watched = cursor.fetchone() is not None
-            allowed = lecture_allowed_by_order(user_id, subject_key, lecture_key)
-            if watched:
-                prefix = "✅"
-            elif allowed:
-                prefix = "▶️"
-            else:
-                prefix = "🔒"
-            label = f"{prefix} {lecture['title']}"
-            if lecture.get("is_new"):
-                label += " 🆕"
-            rows.append([InlineKeyboardButton(label, callback_data=f"lecture|{subject_key}|{lecture_key}")])
-    rows.append([InlineKeyboardButton("⬅️ رجوع", callback_data="menu_my_subjects")])
-    return InlineKeyboardMarkup(rows)
-
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not in_private_chat(update):
@@ -95,12 +57,7 @@ async def menu_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         selected_text = get_subjects_text(row["selected_subjects"])
         secure_text = "مفعّلة" if is_session_valid(user.id) else "غير مفعّلة"
         await query.message.reply_text(
-            f"✨ الرئيسية\n\n"
-            f"🔐 حالة الحماية: {secure_text}\n"
-            f"📋 حالة آخر طلب: {payment_status_text(row['payment_status'])}\n\n"
-            f"📚 المواد المقبولة لديك:\n{approved_text}\n\n"
-            f"🛒 المواد المختارة حالياً:\n{selected_text}\n\n"
-            f"اختر من الأزرار بالأسفل للتسجيل أو متابعة طلباتك أو دخول محاضراتك.",
+            f"✨ الرئيسية\n\n🔐 حالة الحماية: {secure_text}\n\n📚 المواد المقبولة لديك:\n{approved_text}\n\n🛒 المواد المختارة حالياً:\n{selected_text}",
             reply_markup=main_menu_keyboard(user_has_any_approved_subject(user.id), is_session_valid(user.id)),
         )
         return
@@ -123,25 +80,6 @@ async def menu_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    if query.data == "menu_orders":
-        payment_method = get_payment_label(row["selected_payment"])
-        status_text = payment_status_text(row["payment_status"])
-        order_text = row["order_id"] or "لا يوجد"
-        selected_text = get_subjects_text(row["selected_subjects"])
-        approved_text = get_subjects_text(row["approved_subjects"])
-        total = calc_total(row["selected_subjects"])
-        await query.message.reply_text(
-            f"📋 طلباتي\n\n"
-            f"🧾 رقم الطلب الحالي: {order_text}\n"
-            f"📌 حالة الطلب: {status_text}\n"
-            f"💳 طريقة الدفع المختارة: {payment_method}\n\n"
-            f"🛒 المواد المختارة حالياً:\n{selected_text}\n"
-            f"💵 إجمالي المواد المختارة: {total}$\n\n"
-            f"🎓 المواد المفعلة لك:\n{approved_text}",
-            reply_markup=orders_keyboard(user_has_any_approved_subject(user.id)),
-        )
-        return
-
     if query.data == "clear_selection":
         cursor.execute("UPDATE users SET selected_subjects='' WHERE user_id=?", (user.id,))
         conn.commit()
@@ -150,13 +88,13 @@ async def menu_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if query.data == "menu_my_subjects":
         if not row["approved_subjects"]:
-            await query.message.reply_text("❌ لا يوجد لديك مواد مفعلة بعد.", reply_markup=orders_keyboard(False))
+            await query.message.reply_text("❌ لا يوجد لديك مواد مفعلة بعد.")
             return
         if require_security(user.id) and not is_session_valid(user.id):
             await query.message.reply_text(security_intro_text(user.id))
             return
         await query.message.reply_text(
-            f"🎓 المواد المفعلة لك الآن:\n\n{get_subjects_text(row['approved_subjects'])}\n\nاختر المادة التي تريد دخولها:",
+            "🎓 المواد المفعلة لك:",
             reply_markup=approved_subjects_keyboard(row["approved_subjects"]),
         )
         return
@@ -240,45 +178,43 @@ async def payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if row["payment_status"] in ("pending", "reviewing"):
-        await query.message.reply_text(f"⏳ لديك طلب قيد المراجعة بالفعل.\n🧾 رقم الطلب: {row['order_id'] or '-'}")
+        await query.message.reply_text(
+            f"⏳ لديك طلب قيد المراجعة بالفعل.
+🧾 رقم الطلب: {row['order_id'] or '-'}"
+        )
         return
 
     order_id = generate_order_id()
     total = calc_total(row["selected_subjects"])
     method = query.data
-    cursor.execute("UPDATE users SET selected_payment=?, order_id=? WHERE user_id=?", (method, order_id, user.id))
+
+    cursor.execute(
+        """UPDATE users
+           SET selected_payment=?,
+               order_id=?,
+               form_step='payer_full_name',
+               support_pending=0,
+               cash_full_name=NULL,
+               cash_phone=NULL,
+               cash_subject_names=NULL
+           WHERE user_id=?""",
+        (method, order_id, user.id),
+    )
     conn.commit()
 
-    if method == "pay_cash_in_person":
-        cursor.execute(
-            """UPDATE users
-               SET form_step='cash_full_name',
-                   cash_full_name=NULL,
-                   cash_phone=NULL,
-                   cash_amount=NULL,
-                   cash_subject_count=NULL,
-                   cash_subject_names=NULL
-               WHERE user_id=?""",
-            (user.id,),
-        )
-        conn.commit()
-        await query.message.reply_text(
-            f"💵 تم اختيار الدفع نقداً.\n\n"
-            f"🧾 رقم الطلب: {order_id}\n"
-            f"📚 المواد المختارة داخل البوت:\n{get_subjects_text(row['selected_subjects'])}\n"
-            f"💵 الإجمالي: {total}$\n\n"
-            f"أرسل الآن الاسم الثلاثي للطالب."
-        )
-        return
-
-    text = PAYMENT_TEXTS.get(method, "راسل الأدمن لمعرفة طريقة الدفع.")
-    keyboard = [
-        [InlineKeyboardButton("✅ أرسلت الدفع", callback_data="paid")],
-        [InlineKeyboardButton("⬅️ رجوع", callback_data="menu_subjects")],
-    ]
     await query.message.reply_text(
-        f"{text}\n\n🧾 رقم الطلب: {order_id}\n📚 المواد المختارة:\n{get_subjects_text(row['selected_subjects'])}\n💵 الإجمالي: {total}$\n\nبعد الدفع اضغط أرسلت الدفع وأرسل صورة إشعار الدفع.",
-        reply_markup=InlineKeyboardMarkup(keyboard),
+        f"💳 تم اختيار وسيلة الدفع: {get_payment_label(method)}
+
+"
+        f"🧾 رقم الطلب: {order_id}
+"
+        f"📚 المواد المختارة داخل البوت:
+{get_subjects_text(row['selected_subjects'])}
+"
+        f"💵 الإجمالي: {total}$
+
+"
+        f"أرسل الآن الاسم الثلاثي للطالب."
     )
 
 async def paid(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -333,10 +269,13 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📥 طلب دفع جديد\n\n"
             f"🧾 رقم الطلب: {order_id}\n"
             f"👤 المستخدم: {user.first_name}\n"
+            f"👤 الاسم الثلاثي: {row['cash_full_name'] or 'غير مُدخل'}\n"
+            f"📞 الهاتف: {row['cash_phone'] or 'غير مُدخل'}\n"
+            f"📝 أسماء المواد كما كتبها الطالب: {row['cash_subject_names'] or 'غير مُدخل'}\n"
             f"🆔 ID: {user.id}\n"
             f"👤 Username: @{user.username if user.username else 'بدون'}\n"
             f"💳 طريقة الدفع: {payment_method}\n"
-            f"📚 المواد:\n{subjects_text}\n"
+            f"📚 المواد داخل البوت:\n{subjects_text}\n"
             f"💵 الإجمالي: {total}$\n"
             f"📌 الحالة: pending"
         ),
@@ -360,9 +299,12 @@ async def review_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
         caption=(
             f"📥 طلب دفع قيد المراجعة\n\n"
             f"🧾 رقم الطلب: {row['order_id'] or '-'}\n"
+            f"👤 الاسم الثلاثي: {row['cash_full_name'] or 'غير مُدخل'}\n"
+            f"📞 الهاتف: {row['cash_phone'] or 'غير مُدخل'}\n"
+            f"📝 أسماء المواد كما كتبها الطالب: {row['cash_subject_names'] or 'غير مُدخل'}\n"
             f"🆔 ID: {user_id}\n"
             f"💳 طريقة الدفع: {get_payment_label(row['selected_payment'])}\n"
-            f"📚 المواد:\n{get_subjects_text(row['selected_subjects'])}\n"
+            f"📚 المواد داخل البوت:\n{get_subjects_text(row['selected_subjects'])}\n"
             f"📌 الحالة: reviewing"
         ),
         reply_markup=InlineKeyboardMarkup([
@@ -430,13 +372,10 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(
         user_id,
-        f"✅ تم قبول طلبك وتفعيل المواد بنجاح\n\n"
+        f"✅ تم الدفع بنجاح\n\n"
         f"🧾 رقم الطلب: {row['order_id']}\n"
         f"📚 المواد المفعلة لك:\n{get_subjects_text(row['selected_subjects'])}\n\n"
-        f"الخطوات التالية:\n"
-        f"1) افتح زر 🎓 موادي المسجلة\n"
-        f"2) أنشئ PIN أو أدخله\n"
-        f"3) ابدأ من المحاضرة الأولى داخل كل مادة\n\n"
+        f"يمكنك الآن الدخول إلى الفيديوهات.\n\n"
         f"{pin_note}",
         reply_markup=main_menu_keyboard(True, False),
     )
@@ -512,7 +451,7 @@ async def open_subject(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await query.message.reply_text(
         f"{subject['title']}\n\n{subject['description']}\n\n🔒 الترتيب الإجباري مفعّل: يجب فتح المحاضرات بالتسلسل.\nاختر المحاضرة:",
-        reply_markup=build_lectures_keyboard_for_user(query.from_user.id, subject_key),
+        reply_markup=lectures_keyboard(subject_key),
     )
 
 async def lecture_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -588,16 +527,17 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     ensure_user(user.id, user.username, user.first_name)
     text = update.message.text.strip()
-
     row = get_user_row(user.id)
-    
+
     if is_admin(user.id) and get_state("broadcast_pending") == "1":
         cursor.execute("SELECT user_id FROM users WHERE approved_subjects IS NOT NULL AND approved_subjects != ''")
         users = [r[0] for r in cursor.fetchall()]
         sent = 0
         for target_id in users:
             try:
-                await context.bot.send_message(target_id, f"📢 إعلان جديد\n\n{text}")
+                await context.bot.send_message(target_id, f"📢 إعلان جديد
+
+{text}")
                 sent += 1
             except Exception:
                 pass
@@ -608,11 +548,18 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if row["support_pending"] == 1 and not row["form_step"]:
         await context.bot.send_message(
             ADMIN_ID,
-            f"📩 رسالة دعم جديدة\n\n"
-            f"👤 المستخدم: {user.first_name}\n"
-            f"🆔 ID: {user.id}\n"
-            f"👤 Username: @{user.username if user.username else 'بدون'}\n\n"
-            f"📝 الرسالة:\n{text}"
+            f"📩 رسالة دعم جديدة
+
+"
+            f"👤 المستخدم: {user.first_name}
+"
+            f"🆔 ID: {user.id}
+"
+            f"👤 Username: @{user.username if user.username else 'بدون'}
+
+"
+            f"📝 الرسالة:
+{text}"
         )
         cursor.execute("UPDATE users SET support_pending=0 WHERE user_id=?", (user.id,))
         conn.commit()
@@ -622,7 +569,8 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     locked, until = is_locked_out(user.id)
     if locked:
         await update.message.reply_text(
-            f"⛔ تم قفل الدخول مؤقتاً بسبب محاولات PIN خاطئة كثيرة.\nحاول مجدداً بعد {until}."
+            f"⛔ تم قفل الدخول مؤقتاً بسبب محاولات PIN خاطئة كثيرة.
+حاول مجدداً بعد {until}."
         )
         return
 
@@ -651,69 +599,127 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         attempts = record_failed_pin(user.id)
         await update.message.reply_text(
-            f"❌ PIN غير صحيح.\nالمحاولات المتبقية قبل القفل: {max(0, 5 - attempts)}"
+            f"❌ PIN غير صحيح.
+المحاولات المتبقية قبل القفل: {max(0, 5 - attempts)}"
         )
         return
 
-    if row["form_step"] == "cash_full_name":
+    if row["form_step"] == "payer_full_name":
         cursor.execute(
-            "UPDATE users SET cash_full_name=?, form_step='cash_phone' WHERE user_id=?",
+            "UPDATE users SET cash_full_name=?, form_step='payer_phone' WHERE user_id=?",
             (text, user.id),
         )
         conn.commit()
         await update.message.reply_text("📞 أرسل رقم هاتف الطالب.")
         return
 
-    if row["form_step"] == "cash_phone":
+    if row["form_step"] == "payer_phone":
         cursor.execute(
-            "UPDATE users SET cash_phone=?, form_step='cash_subject_names' WHERE user_id=?",
+            "UPDATE users SET cash_phone=?, form_step='payer_subject_names' WHERE user_id=?",
             (text, user.id),
         )
         conn.commit()
         await update.message.reply_text("📝 أرسل أسماء المواد المسجل عليها الطالب.")
         return
 
-    if row["form_step"] == "cash_subject_names":
+    if row["form_step"] == "payer_subject_names":
         cursor.execute(
             """UPDATE users
-               SET cash_subject_names=?, form_step=NULL, payment_status='pending', request_at=?
+               SET cash_subject_names=?, form_step=NULL
                WHERE user_id=?""",
-            (text, now_str(), user.id),
+            (text, user.id),
         )
         conn.commit()
 
         refreshed = get_user_row(user.id)
         order_id = refreshed["order_id"] or generate_order_id()
         total = calc_total(refreshed["selected_subjects"])
+        payment_method = refreshed["selected_payment"]
 
+        if payment_method == "pay_cash_in_person":
+            cursor.execute(
+                "UPDATE users SET payment_status='pending', request_at=? WHERE user_id=?",
+                (now_str(), user.id),
+            )
+            conn.commit()
+
+            keyboard = [
+                [InlineKeyboardButton("👁 بدء المراجعة", callback_data=f"review|{user.id}")],
+                [InlineKeyboardButton("✅ قبول الدفع", callback_data=f"approve|{user.id}")],
+                [InlineKeyboardButton("❌ رفض الدفع", callback_data=f"reject|{user.id}")],
+            ]
+
+            sent = await context.bot.send_message(
+                ADMIN_ID,
+                f"📥 طلب تسجيل جديد
+
+"
+                f"🧾 رقم الطلب: {order_id}
+"
+                f"👤 اسم الطالب: {refreshed['cash_full_name']}
+"
+                f"🆔 ID: {user.id}
+"
+                f"👤 Username: @{user.username if user.username else 'بدون'}
+"
+                f"📞 الهاتف: {refreshed['cash_phone']}
+"
+                f"📝 أسماء المواد كما كتبها الطالب: {text}
+"
+                f"📚 المواد المختارة داخل البوت:
+{get_subjects_text(refreshed['selected_subjects'])}
+"
+                f"💰 الإجمالي المحسوب داخل البوت: {total}$
+"
+                f"💳 طريقة الدفع: {get_payment_label(payment_method)}
+"
+                f"📌 الحالة: pending",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+            )
+
+            cursor.execute(
+                "UPDATE users SET admin_message_id=?, order_id=? WHERE user_id=?",
+                (sent.message_id, order_id, user.id),
+            )
+            conn.commit()
+
+            await update.message.reply_text(
+                f"✅ تم إرسال طلبك إلى الأدمن للمراجعة.
+🧾 رقم طلبك: {order_id}"
+            )
+            return
+
+        payment_text = PAYMENT_TEXTS.get(payment_method, "راسل الأدمن لمعرفة طريقة الدفع.")
         keyboard = [
-            [InlineKeyboardButton("👁 بدء المراجعة", callback_data=f"review|{user.id}")],
-            [InlineKeyboardButton("✅ قبول الدفع", callback_data=f"approve|{user.id}")],
-            [InlineKeyboardButton("❌ رفض الدفع", callback_data=f"reject|{user.id}")],
+            [InlineKeyboardButton("✅ أرسلت الدفع", callback_data="paid")],
+            [InlineKeyboardButton("⬅️ رجوع", callback_data="menu_subjects")],
         ]
 
-        sent = await context.bot.send_message(
-            ADMIN_ID,
-            f"📥 طلب تسجيل نقدي جديد\n\n"
-            f"🧾 رقم الطلب: {order_id}\n"
-            f"👤 اسم الطالب: {refreshed['cash_full_name']}\n"
-            f"🆔 ID: {user.id}\n"
-            f"👤 Username: @{user.username if user.username else 'بدون'}\n"
-            f"📞 الهاتف: {refreshed['cash_phone']}\n"
-            f"📝 أسماء المواد كما كتبها الطالب: {text}\n"
-            f"📚 المواد المختارة داخل البوت:\n{get_subjects_text(refreshed['selected_subjects'])}\n"
-            f"💰 الإجمالي المحسوب داخل البوت: {total}$\n"
-            f"💳 طريقة الدفع: نقداً\n"
-            f"📌 الحالة: pending",
+        await update.message.reply_text(
+            f"✅ تم حفظ بياناتك.
+
+"
+            f"👤 الاسم الثلاثي: {refreshed['cash_full_name']}
+"
+            f"📞 الهاتف: {refreshed['cash_phone']}
+"
+            f"📝 أسماء المواد: {text}
+
+"
+            f"{payment_text}
+
+"
+            f"🧾 رقم الطلب: {order_id}
+"
+            f"📚 المواد المختارة داخل البوت:
+{get_subjects_text(refreshed['selected_subjects'])}
+"
+            f"💵 الإجمالي: {total}$
+
+"
+            f"بعد الدفع اضغط أرسلت الدفع وأرسل صورة إشعار الدفع.",
             reply_markup=InlineKeyboardMarkup(keyboard),
         )
-
-        cursor.execute(
-            "UPDATE users SET admin_message_id=?, order_id=? WHERE user_id=?",
-            (sent.message_id, order_id, user.id),
-        )
-        conn.commit()
-        await update.message.reply_text(f"✅ تم إرسال طلبك إلى الأدمن للمراجعة.\n🧾 رقم طلبك: {order_id}")
         return
 
     if row["approved_subjects"] and not row["security_pin"]:
