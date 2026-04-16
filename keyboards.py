@@ -10,7 +10,7 @@ from helpers import calc_total, get_years, get_subject, get_subject_title
 
 def persistent_main_keyboard():
     keyboard = [
-        [KeyboardButton("▶️ Start")],
+        [KeyboardButton("يلا نبلّش 🤍 🤍")],
         [KeyboardButton("🏠 الرئيسية")],
         [KeyboardButton("📚 المواد والأسعار")],
         [KeyboardButton("🛒 السلة والدفع")],
@@ -32,7 +32,7 @@ def persistent_main_keyboard():
 
 def main_menu_keyboard(has_approved: bool, session_valid: bool):
     rows = [
-        [InlineKeyboardButton("▶️ Start", callback_data="menu_start")],
+        [InlineKeyboardButton("يلا نبلّش 🤍 🤍", callback_data="menu_start")],
         [InlineKeyboardButton("🏠 الرئيسية", callback_data="menu_home")],
         [InlineKeyboardButton("📚 المواد والأسعار", callback_data="menu_subjects")],
         [InlineKeyboardButton("🛒 السلة والدفع", callback_data="menu_checkout")],
