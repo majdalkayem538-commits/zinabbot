@@ -235,7 +235,7 @@ async def payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🧾 رقم الطلب: {order_id}\n"
         f"📚 المواد المختارة داخل البوت:\n{get_subjects_text(row['selected_subjects'])}\n"
         f"💵 الإجمالي: {total}$\n\n"
-        f"أرسل الآن الاسم الثلاثي للطالب."
+        f"أدخل الاسم الثلاثي."
     )
 
 
@@ -295,7 +295,7 @@ async def receive_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🧾 رقم الطلب: {order_id}\n"
             f"👤 المستخدم: {user.first_name}\n"
             f"👤 الاسم الثلاثي: {row['cash_full_name'] or 'غير مُدخل'}\n"
-            f"🆔 رقم الطالب: {row['cash_student_number'] or 'غير مُدخل'}\n"
+            f"🆔 الرقم الجامعي: {row['cash_student_number'] or 'غير مُدخل'}\n"
             f"📞 الهاتف: {row['cash_phone'] or 'غير مُدخل'}\n"
             f"📝 أسماء المواد كما كتبها الطالب: {row['cash_subject_names'] or 'غير مُدخل'}\n"
             f"🆔 ID: {user.id}\n"
@@ -329,7 +329,7 @@ async def review_payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📥 طلب دفع قيد المراجعة\n\n"
             f"🧾 رقم الطلب: {row['order_id'] or '-'}\n"
             f"👤 الاسم الثلاثي: {row['cash_full_name'] or 'غير مُدخل'}\n"
-            f"🆔 رقم الطالب: {row['cash_student_number'] or 'غير مُدخل'}\n"
+            f"🆔 الرقم الجامعي: {row['cash_student_number'] or 'غير مُدخل'}\n"
             f"📞 الهاتف: {row['cash_phone'] or 'غير مُدخل'}\n"
             f"📝 أسماء المواد كما كتبها الطالب: {row['cash_subject_names'] or 'غير مُدخل'}\n"
             f"🆔 ID: {user_id}\n"
@@ -426,7 +426,7 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🧾 رقم الطلب: {row['order_id']}\n"
         f"👤 الاسم: {user.first_name}\n"
         f"👤 الاسم الثلاثي: {row['cash_full_name'] or 'غير مُدخل'}\n"
-        f"🆔 رقم الطالب: {row['cash_student_number'] or 'غير مُدخل'}\n"
+        f"🆔 الرقم الجامعي: {row['cash_student_number'] or 'غير مُدخل'}\n"
         f"🔗 اليوزر: @{user.username if user.username else 'لا يوجد'}\n"
         f"🆔 ID: {user_id}\n"
         f"💳 الطريقة: {get_payment_label(row['selected_payment'])}\n"
@@ -791,7 +791,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             (text, user.id),
         )
         conn.commit()
-        await update.message.reply_text("🆔 أرسل رقم الطالب.")
+        await update.message.reply_text("🆔 أرسل الرقم الجامعي.")
         return
 
     if row["form_step"] == "payer_student_number":
@@ -809,7 +809,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             (text, user.id),
         )
         conn.commit()
-        await update.message.reply_text("📝 أرسل أسماء المواد المسجل عليها الطالب.")
+        await update.message.reply_text("📝 أرسل أسماء المواد المسجل عليها .")
         return
 
     if row["form_step"] == "payer_subject_names":
@@ -844,7 +844,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"📥 طلب تسجيل جديد\n\n"
                 f"🧾 رقم الطلب: {order_id}\n"
                 f"👤 اسم الطالب: {refreshed['cash_full_name']}\n"
-                f"🆔 رقم الطالب: {refreshed['cash_student_number'] or 'غير مُدخل'}\n"
+                f"🆔 الرقم الجامعي: {refreshed['cash_student_number'] or 'غير مُدخل'}\n"
                 f"🆔 ID: {user.id}\n"
                 f"👤 Username: @{user.username if user.username else 'بدون'}\n"
                 f"📞 الهاتف: {refreshed['cash_phone']}\n"
@@ -876,7 +876,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"✅ تم حفظ بياناتك.\n\n"
             f"👤 الاسم الثلاثي: {refreshed['cash_full_name']}\n"
-            f"🆔 رقم الطالب: {refreshed['cash_student_number'] or 'غير مُدخل'}\n"
+            f"🆔 الرقم الجامعي: {refreshed['cash_student_number'] or 'غير مُدخل'}\n"
             f"📞 الهاتف: {refreshed['cash_phone']}\n"
             f"📝 أسماء المواد: {text}\n\n"
             f"{payment_text}\n\n"
