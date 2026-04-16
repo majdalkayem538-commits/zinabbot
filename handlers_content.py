@@ -2,6 +2,7 @@ import time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
+from keyboards import persistent_main_keyboard
 from config import ADMIN_ID, FAQ_TEXT, PAYMENT_TEXTS, WELCOME_TEXT, MIN_PIN_LENGTH
 from database import cursor, conn
 from helpers import (
@@ -32,16 +33,14 @@ def security_intro_text(user_id: int) -> str:
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not in_private_chat(update):
         return
+
     user = update.effective_user
     ensure_user(user.id, user.username, user.first_name)
+
     await update.message.reply_text(
         WELCOME_TEXT,
-        reply_markup=main_menu_keyboard(
-            user_has_any_approved_subject(user.id),
-            is_session_valid(user.id),
-        ),
+        reply_markup=persistent_main_keyboard()
     )
-
 
 async def menu_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -581,6 +580,111 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     ensure_user(user.id, user.username, user.first_name)
     text = update.message.text.strip()
+        if text == "▶️ Start":
+        await update.message.reply_text(
+            "أهلاً بك 🌟\nاختر من القائمة ما تريد.",
+            reply_markup=persistent_main_keyboard()
+        )
+        return
+
+    if text == "🏠 الرئيسية":
+        row = get_user_row(user.id)
+        approved_text = get_subjects_text(row["approved_subjects"])
+        selected_text = get_subjects_text(row["selected_subjects"])
+        secure_text = "مفعّلة" if is_session_valid(user.id) else "غير مفعّلة"
+        await update.message.reply_text(
+            f"✨ الرئيسية\n\n"
+            f"🔐 حالة الحماية: {secure_text}\n\n"
+            f"📚 المواد المقبولة لديك:\n{approved_text}\n\n"
+            f"🛒 المواد المختارة حالياً:\n{selected_text}",
+            reply_markup=persistent_main_keyboard()
+        )
+        return
+
+    if text == "📚 المواد والأسعار":
+        await update.message.reply_text(
+            "📚 المواد مرتبة حسب السنوات\nاختر من الأزرار داخل الرسائل للتصفح.",
+            reply_markup=years_keyboard(get_user_row(user.id)["selected_subjects"])
+        )
+        return
+
+    if text == "🛒 السلة والدفع":
+        row = get_user_row(user.id)
+        if not row["selected_subjects"]:
+            await update.message.reply_text("⚠️ لم تختر أي مادة بعد.")
+            return
+        total = calc_total(row["selected_subjects"])
+        await update.message.reply_text(
+            f"🛒 المواد المختارة:\n{get_subjects_text(row['selected_subjects'])}\n\n"
+            f"💵 الإجمالي: {total}$\n\nاختر طريقة الدفع:",
+            reply_markup=payment_keyboard()
+        )
+        return
+
+    if text == "📋 طلباتي":
+        row = get_user_row(user.id)
+        await update.message.reply_text(
+            f"📋 طلباتك\n\n"
+            f"🧾 رقم الطلب: {row['order_id'] or 'لا يوجد'}\n"
+            f"💳 حالة الطلب: {row['payment_status']}\n"
+            f"📚 المواد المختارة:\n{get_subjects_text(row['selected_subjects'])}\n"
+            f"🎓 المواد المفعلة:\n{get_subjects_text(row['approved_subjects'])}",
+            reply_markup=persistent_main_keyboard()
+        )
+        return
+
+    if text == "🎓 موادي المسجلة":
+        row = get_user_row(user.id)
+        if not row["approved_subjects"]:
+            await update.message.reply_text("❌ لا يوجد لديك مواد مفعلة بعد.")
+            return
+        if require_security(user.id) and not is_session_valid(user.id):
+            await update.message.reply_text(security_intro_text(user.id))
+            return
+        await update.message.reply_text(
+            "🎓 المواد المفعلة لك:",
+            reply_markup=approved_subjects_keyboard(row["approved_subjects"])
+        )
+        return
+
+    if text == "▶️ أكمل من آخر محاضرة":
+        row = get_user_row(user.id)
+        compound = row["last_lecture_compound"]
+        if not compound or "|" not in compound:
+            await update.message.reply_text("ℹ️ لم تشاهد أي محاضرة بعد.")
+            return
+        if require_security(user.id) and not is_session_valid(user.id):
+            await update.message.reply_text(security_intro_text(user.id))
+            return
+        subject_key, lecture_key = compound.split("|", 1)
+        lecture = find_lecture(subject_key, lecture_key)
+        if not lecture:
+            await update.message.reply_text("⚠️ آخر محاضرة غير موجودة حالياً.")
+            return
+        await context.bot.send_video(
+            chat_id=user.id,
+            video=lecture["file_id"],
+            protect_content=True
+        )
+        return
+
+    if text == "🔐 قفل الجلسة":
+        lock_session(user.id)
+        await update.message.reply_text("🔐 تم قفل الجلسة.")
+        return
+
+    if text == "❓ الأسئلة الشائعة":
+        await update.message.reply_text(
+            FAQ_TEXT,
+            reply_markup=persistent_main_keyboard()
+        )
+        return
+
+    if text == "📩 الدعم":
+        cursor.execute("UPDATE users SET support_pending=1 WHERE user_id=?", (user.id,))
+        conn.commit()
+        await update.message.reply_text("📩 اكتب رسالتك الآن وسيتم إرسالها إلى الدعم.")
+        return
     row = get_user_row(user.id)
 
     if is_admin(user.id) and get_state("broadcast_pending") == "1":
