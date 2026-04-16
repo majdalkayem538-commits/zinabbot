@@ -178,10 +178,10 @@ async def payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if row["payment_status"] in ("pending", "reviewing"):
-        await query.message.reply_text(
-            f"⏳ لديك طلب قيد المراجعة بالفعل.
-🧾 رقم الطلب: {row['order_id'] or '-'}"
-        )
+   await update.message.reply_text(
+    f"🟡 لديك طلب قيد المراجعة بالفعل.\n"
+    f"🧾 رقم الطلب: {row['order_id']}"
+)
         return
 
     order_id = generate_order_id()
