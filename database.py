@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import os
@@ -41,6 +40,7 @@ CREATE TABLE IF NOT EXISTS users(
     approved_at TEXT,
     form_step TEXT,
     cash_full_name TEXT,
+    cash_student_number TEXT,
     cash_phone TEXT,
     cash_amount TEXT,
     cash_subject_count TEXT,
@@ -96,6 +96,7 @@ ensure_column("users", "approved_subjects", "TEXT DEFAULT ''")
 ensure_column("users", "last_lecture_compound", "TEXT")
 ensure_column("users", "form_step", "TEXT")
 ensure_column("users", "cash_full_name", "TEXT")
+ensure_column("users", "cash_student_number", "TEXT")
 ensure_column("users", "cash_phone", "TEXT")
 ensure_column("users", "cash_amount", "TEXT")
 ensure_column("users", "cash_subject_count", "TEXT")
