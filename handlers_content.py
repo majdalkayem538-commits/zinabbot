@@ -588,16 +588,9 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     row = get_user_row(user.id)
 
-    if text == "▶️ Start":
+ if text == "▶️ Start":
         await update.message.reply_text(
-            "✨ أهلاً فيكم أصدقائي 🤍
-معكم الآنسة زينب سلوم 
-
-هون رح تلاقوا شرح بسيط وفيديوهات مرتبة تساعدكم تفهموا بسهولة 📚🎥
-
-تابعوا بالترتيب وخلوها خفيفة ولطيفة 💌🤍
-
-يلا نبلّش 🤍 🤍\nاختر من القائمة ما تريد.",
+            "أهلاً بك 🌟\nاختر من القائمة ما تريد.",
             reply_markup=persistent_main_keyboard()
         )
         return
