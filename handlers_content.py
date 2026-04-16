@@ -2,7 +2,6 @@ import time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
-from keyboards import persistent_main_keyboard
 from config import ADMIN_ID, FAQ_TEXT, PAYMENT_TEXTS, WELCOME_TEXT, MIN_PIN_LENGTH
 from database import cursor, conn
 from helpers import (
@@ -14,6 +13,7 @@ from helpers import (
     record_failed_pin, clear_failed_pin, in_private_chat
 )
 from keyboards import (
+    persistent_main_keyboard,
     main_menu_keyboard, years_keyboard, year_subjects_keyboard, payment_keyboard,
     approved_subjects_keyboard, lectures_keyboard
 )
@@ -25,9 +25,13 @@ def security_intro_text(user_id: int) -> str:
         return (
             "🔐 لحماية المحتوى، يجب إنشاء PIN أمان قبل دخول المواد.\n\n"
             f"أرسل الآن PIN مكوّن من {MIN_PIN_LENGTH} أرقام أو أكثر.\n"
-            "مثال: 2580"
+            "مثال: 2580\n\n"
+            "إذا نسيت الرقم السري لاحقًا أرسل: 🔄 تغيير PIN"
         )
-    return "🔑 أرسل PIN الأمان للدخول إلى المواد والمحاضرات."
+    return (
+        "🔑 أرسل PIN الأمان للدخول إلى المواد والمحاضرات.\n\n"
+        "إذا نسيت الرقم السري أو تريد تغييره أرسل: 🔄 تغيير PIN"
+    )
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -41,6 +45,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         WELCOME_TEXT,
         reply_markup=persistent_main_keyboard()
     )
+
 
 async def menu_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -365,7 +370,8 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
                approved_subjects=?,
                selected_subjects='',
                is_verified=0,
-               session_expires_at=NULL
+               session_expires_at=NULL,
+               form_step=NULL
            WHERE user_id=?""",
         (approved_at, join_subjects(approved), user_id),
     )
@@ -441,7 +447,7 @@ async def reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
     row = get_user_row(user_id)
     total = calc_total(row["selected_subjects"])
 
-    cursor.execute("UPDATE users SET payment_status='rejected' WHERE user_id=?", (user_id,))
+    cursor.execute("UPDATE users SET payment_status='rejected', form_step=NULL WHERE user_id=?", (user_id,))
     cursor.execute(
         """INSERT INTO sales (user_id, order_id, subjects, payment_method, amount, status, approved_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)""",
@@ -580,7 +586,9 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     ensure_user(user.id, user.username, user.first_name)
     text = update.message.text.strip()
-        if text == "▶️ Start":
+    row = get_user_row(user.id)
+
+    if text == "▶️ Start":
         await update.message.reply_text(
             "أهلاً بك 🌟\nاختر من القائمة ما تريد.",
             reply_markup=persistent_main_keyboard()
@@ -588,7 +596,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if text == "🏠 الرئيسية":
-        row = get_user_row(user.id)
         approved_text = get_subjects_text(row["approved_subjects"])
         selected_text = get_subjects_text(row["selected_subjects"])
         secure_text = "مفعّلة" if is_session_valid(user.id) else "غير مفعّلة"
@@ -604,12 +611,11 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "📚 المواد والأسعار":
         await update.message.reply_text(
             "📚 المواد مرتبة حسب السنوات\nاختر من الأزرار داخل الرسائل للتصفح.",
-            reply_markup=years_keyboard(get_user_row(user.id)["selected_subjects"])
+            reply_markup=years_keyboard(row["selected_subjects"])
         )
         return
 
     if text == "🛒 السلة والدفع":
-        row = get_user_row(user.id)
         if not row["selected_subjects"]:
             await update.message.reply_text("⚠️ لم تختر أي مادة بعد.")
             return
@@ -622,7 +628,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if text == "📋 طلباتي":
-        row = get_user_row(user.id)
         await update.message.reply_text(
             f"📋 طلباتك\n\n"
             f"🧾 رقم الطلب: {row['order_id'] or 'لا يوجد'}\n"
@@ -634,7 +639,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if text == "🎓 موادي المسجلة":
-        row = get_user_row(user.id)
         if not row["approved_subjects"]:
             await update.message.reply_text("❌ لا يوجد لديك مواد مفعلة بعد.")
             return
@@ -648,7 +652,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if text == "▶️ أكمل من آخر محاضرة":
-        row = get_user_row(user.id)
         compound = row["last_lecture_compound"]
         if not compound or "|" not in compound:
             await update.message.reply_text("ℹ️ لم تشاهد أي محاضرة بعد.")
@@ -673,6 +676,21 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🔐 تم قفل الجلسة.")
         return
 
+    if text in ("🔄 تغيير PIN", "نسيت PIN", "نسيت الرقم السري"):
+        if not row["approved_subjects"]:
+            await update.message.reply_text("ℹ️ لا يوجد لديك مواد مفعلة حتى تغيّر PIN.")
+            return
+        cursor.execute(
+            "UPDATE users SET security_pin=NULL, is_verified=0, session_expires_at=NULL, form_step='reset_pin_new' WHERE user_id=?",
+            (user.id,),
+        )
+        conn.commit()
+        await update.message.reply_text(
+            f"🔄 تم بدء إعادة تعيين PIN.\n"
+            f"أرسل الآن PIN جديد مكوّن من {MIN_PIN_LENGTH} أرقام أو أكثر."
+        )
+        return
+
     if text == "❓ الأسئلة الشائعة":
         await update.message.reply_text(
             FAQ_TEXT,
@@ -685,7 +703,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.commit()
         await update.message.reply_text("📩 اكتب رسالتك الآن وسيتم إرسالها إلى الدعم.")
         return
-    row = get_user_row(user.id)
 
     if is_admin(user.id) and get_state("broadcast_pending") == "1":
         cursor.execute("SELECT user_id FROM users WHERE approved_subjects IS NOT NULL AND approved_subjects != ''")
@@ -718,6 +735,24 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if locked:
         await update.message.reply_text(
             f"⛔ تم قفل الدخول مؤقتاً بسبب محاولات PIN خاطئة كثيرة.\nحاول مجدداً بعد {until}."
+        )
+        return
+
+    if row["form_step"] == "reset_pin_new":
+        if not text.isdigit() or len(text) < MIN_PIN_LENGTH:
+            await update.message.reply_text(
+                f"❌ PIN غير صالح. أرسل رقمًا مكوّنًا من {MIN_PIN_LENGTH} أرقام أو أكثر."
+            )
+            return
+        cursor.execute(
+            "UPDATE users SET security_pin=?, form_step=NULL, pin_attempts=0, locked_until=NULL WHERE user_id=?",
+            (hash_pin(text), user.id),
+        )
+        conn.commit()
+        start_session(user.id)
+        await update.message.reply_text(
+            "✅ تم تغيير PIN بنجاح وفتح الجلسة.",
+            reply_markup=persistent_main_keyboard()
         )
         return
 
@@ -856,4 +891,3 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if row["approved_subjects"] and not row["security_pin"]:
         await update.message.reply_text(security_intro_text(user.id))
         return
-
