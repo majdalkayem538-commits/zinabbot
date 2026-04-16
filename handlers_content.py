@@ -235,7 +235,7 @@ async def payment(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🧾 رقم الطلب: {order_id}\n"
         f"📚 المواد المختارة داخل البوت:\n{get_subjects_text(row['selected_subjects'])}\n"
         f"💵 الإجمالي: {total}$\n\n"
-        f"أرسل الآن اسمك الثلاثي ."
+        f"أرسل الآن الاسم الثلاثي للطالب."
     )
 
 
@@ -431,7 +431,7 @@ async def approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🆔 ID: {user_id}\n"
         f"💳 الطريقة: {get_payment_label(row['selected_payment'])}\n"
         f"📚 المواد المفعلة:\n{get_subjects_text(row['selected_subjects'])}\n\n"
-        f"الطالب  بإمكانه الدخول إلى مكتبة الفيديوهات."
+        f"المستخدم صار بإمكانه الدخول إلى مكتبة الفيديوهات."
     )
 
 
@@ -588,7 +588,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     row = get_user_row(user.id)
 
- if text == "▶️ Start":
+    if text == "▶️ Start":
         await update.message.reply_text(
             "أهلاً بك 🌟\nاختر من القائمة ما تريد.",
             reply_markup=persistent_main_keyboard()
@@ -791,7 +791,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             (text, user.id),
         )
         conn.commit()
-        await update.message.reply_text("🆔 أرسل رقم الهاتف.")
+        await update.message.reply_text("🆔 أرسل رقم الطالب.")
         return
 
     if row["form_step"] == "payer_student_number":
@@ -800,7 +800,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             (text, user.id),
         )
         conn.commit()
-        await update.message.reply_text("📞 أرسل رقم الهاتف .")
+        await update.message.reply_text("📞 أرسل رقم هاتف الطالب.")
         return
 
     if row["form_step"] == "payer_phone":
@@ -809,7 +809,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             (text, user.id),
         )
         conn.commit()
-        await update.message.reply_text("📝 أرسل أسماء المواد المسجل عليها .")
+        await update.message.reply_text("📝 أرسل أسماء المواد المسجل عليها الطالب.")
         return
 
     if row["form_step"] == "payer_subject_names":
