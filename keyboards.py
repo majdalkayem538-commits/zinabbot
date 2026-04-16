@@ -1,6 +1,27 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from helpers import calc_total, get_years, get_subject, get_subject_title
 
+from telegram import KeyboardButton, ReplyKeyboardMarkup
+
+def persistent_main_keyboard():
+    keyboard = [
+        [KeyboardButton("▶️ Start")],
+        [KeyboardButton("🏠 الرئيسية")],
+        [KeyboardButton("📚 المواد والأسعار")],
+        [KeyboardButton("🛒 السلة والدفع")],
+        [KeyboardButton("📋 طلباتي")],
+        [KeyboardButton("🎓 موادي المسجلة")],
+        [KeyboardButton("▶️ أكمل من آخر محاضرة")],
+        [KeyboardButton("🔐 قفل الجلسة")],
+        [KeyboardButton("❓ الأسئلة الشائعة")],
+        [KeyboardButton("📩 الدعم")],
+    ]
+    return ReplyKeyboardMarkup(
+        keyboard,
+        resize_keyboard=True,
+        one_time_keyboard=False
+    )
+    
 def main_menu_keyboard(has_approved: bool, session_valid: bool):
     rows = [
         [InlineKeyboardButton("▶️ Start", callback_data="menu_start")],
